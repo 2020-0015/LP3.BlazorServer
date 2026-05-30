@@ -1,0 +1,455 @@
+﻿@page "/estudiantes"
+@rendermode InteractiveServer
+
+@using LP3.BlazorServer.Shared.DTOs
+@using LP3.BlazorServer.Application.Services
+@using LP3.BlazorServer.Domain.Enums
+
+@inject IEstudianteService EstudianteService
+
+<div class="container mt-5">
+
+    <h1>📚 Gestión de Estudiantes</h1>
+    <p class="text-muted">
+        Aquí puedes crear, consultar, editar y eliminar estudiantes
+    </p>
+
+    <!-- Aquí irán las secciones de búsqueda, registro, edición y eliminación -->
+
+    <div class="card mb-4">
+        <div class="card-body">
+
+            <h4>🔍 Buscar Estudiante por Matrícula</h4>
+
+            <div class="input-group">
+                <input type="text"
+                       class="form-control"
+                       @bind="matriculaBusqueda"
+                       placeholder="Ej: 2024001" />
+
+                <button class="btn btn-primary"
+                        @onclick="BuscarPorMatricula">
+                    Buscar
+                </button>
+            </div>
+
+            @if (estudianteBuscado != null)
+            {
+                <div class="alert alert-info mt-3">
+                    <strong>✓ Encontrado:</strong>
+                    @estudianteBuscado.Nombre
+                    @estudianteBuscado.Apellido
+                    (ID: @estudianteBuscado.Id)
+                </div>
+            }
+
+        </div>
+    </div>
+    <!--registrar-->
+    <div class="card mb-4">
+        <div class="card-body">
+
+            <h4>➕ Registrar Nuevo Estudiante</h4>
+
+            <EditForm FormName="registroEstudianteForm"
+                      Model="nuevoEstudiante"
+                      OnValidSubmit="RegistrarEstudiante">
+
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="row">
+
+                    <div class="col-md-6 mb-3">
+                        <label for="nombre" class="form-label">
+                            Nombre:
+                        </label>
+
+                        <InputText id="nombre"
+                                   @bind-Value="nuevoEstudiante.Nombre"
+                                   class="form-control"
+                                   placeholder="Ej: Juan" />
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label for="apellido" class="form-label">
+                            Apellido:
+                        </label>
+
+                        <InputText id="apellido"
+                                   @bind-Value="nuevoEstudiante.Apellido"
+                                   class="form-control"
+                                   placeholder="Ej: Pérez" />
+                    </div>
+
+                </div>
+
+                <div class="row">
+
+                    <div class="col-md-6 mb-3">
+                        <label for="matricula-new" class="form-label">
+                            Matrícula:
+                        </label>
+
+                        <InputText id="matricula-new"
+                                   @bind-Value="nuevoEstudiante.Matricula"
+                                   class="form-control"
+                                   placeholder="Ej: 2024001" />
+                    </div>
+
+                    @*
+                    <div class="col-md-6 mb-3">
+                        <label for="email-new" class="form-label">Email:</label>
+                        <InputText id="email-new"
+                                   type="email"
+                                   @bind-Value="nuevoEstudiante.Email"
+                                   class="form-control"
+                                   placeholder="Ej: juan@example.com" />
+                    </div>
+                    *@
+
+                </div>
+
+                <button type="submit" class="btn btn-success">
+                    ✓ Guardar Estudiante
+                </button>
+
+            </EditForm>
+
+            @if (!string.IsNullOrEmpty(mensajeRegistro))
+            {
+                <div class="alert mt-3"
+                     style="@(mensajeRegistro.StartsWith("✅")
+                                          ? "background: #d4edda;"
+                                          : "background: #f8d7da;")">
+
+                    @mensajeRegistro
+
+                </div>
+            }
+
+        </div>
+    </div>
+
+    <!--Buscar-->
+
+    <div class="card">
+        <div class="card-body">
+
+            <h4>
+                📊 Estudiantes Registrados (@estudiantes?.Count)
+            </h4>
+
+            @if (estudiantes == null || estudiantes.Count == 0)
+            {
+                <div class="alert alert-info">
+                    No hay estudiantes registrados aún.
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+
+                    <table class="table table-striped table-hover">
+
+                        <thead class="table-dark">
+                            <tr>
+                                <th>ID</th>
+                                <th>Nombre</th>
+                                <th>Apellido</th>
+                                <th>Matrícula</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+
+                            @foreach (var est in estudiantes ?? [])
+                            {
+                                <tr>
+
+                                    <td>@est.Id</td>
+                                    <td>@est.Nombre</td>
+                                    <td>@est.Apellido</td>
+
+                                    <td>
+                                        <strong>@est.Matricula</strong>
+                                    </td>
+
+                                    <td>
+
+                                        <button class="btn btn-sm btn-warning"
+                                                @onclick="() => CargarParaEditar(est)">
+                                            ✏️ Editar
+                                        </button>
+
+                                        <button class="btn btn-sm btn-danger"
+                                                @onclick="() => ConfirmarEliminar(est.Id)">
+                                            🗑️ Eliminar
+                                        </button>
+
+                                    </td>
+
+                                </tr>
+                            }
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+            }
+
+        </div>
+    </div>
+    
+    <!-- Editar -->
+    
+    @if (editandoEstudiante != null)
+    {
+        <div class="card mt-4 border-warning">
+
+            <div class="card-body">
+
+                <h4>✏️ Editar Estudiante</h4>
+
+                <EditForm Model="editandoEstudiante"
+                          OnValidSubmit="GuardarCambios">
+
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    <div class="row">
+
+                        <div class="col-md-6 mb-3">
+                            <label for="nombre-edit" class="form-label">
+                                Nombre:
+                            </label>
+
+                            <InputText id="nombre-edit"
+                                       @bind-Value="editandoEstudiante.Nombre"
+                                       class="form-control" />
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="apellido-edit" class="form-label">
+                                Apellido:
+                            </label>
+
+                            <InputText id="apellido-edit"
+                                       @bind-Value="editandoEstudiante.Apellido"
+                                       class="form-control" />
+                        </div>
+
+                    </div>
+
+                    <div class="row">
+
+                        <div class="col-md-6 mb-3">
+                            <label for="matricula-edit" class="form-label">
+                                Matrícula (No editable):
+                            </label>
+
+                            <InputText id="matricula-edit"
+                                       @bind-Value="editandoEstudiante.Matricula"
+                                       class="form-control"
+                                       disabled />
+                        </div>
+
+                    </div>
+
+                    <button type="submit"
+                            class="btn btn-primary">
+                        ✓ Guardar Cambios
+                    </button>
+
+                    <button type="button"
+                            class="btn btn-secondary"
+                            @onclick="CancelarEdicion">
+                        ✕ Cancelar
+                    </button>
+
+                </EditForm>
+
+            </div>
+
+        </div>
+    }
+
+    <!--Quitar o eliminar-->
+    @if (mostrarConfirmacionEliminar)
+    {
+        <div class="card mt-4 border-danger">
+
+            <div class="card-body">
+
+                <div class="alert alert-danger" role="alert">
+
+                    <h5>⚠️ Confirmar Eliminación</h5>
+
+                    <p>
+                        ¿Está seguro de que desea eliminar este estudiante?
+                    </p>
+
+                    <p style="color: #721c24; font-size: 0.9em;">
+                        <strong>
+                            Esta acción no se puede deshacer.
+                        </strong>
+                    </p>
+
+                    <button class="btn btn-danger"
+                            @onclick="EliminarEstudiante">
+                        Sí, Eliminar Permanentemente
+                    </button>
+
+                    <button class="btn btn-secondary"
+                            @onclick="CancelarEliminar">
+                        Cancelar
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+    }
+
+</div>
+
+@code {
+    // Variables para almacenar datos
+    private ICollection<EstudianteDto> estudiantes = [];
+    private string mensajeRegistro = string.Empty;
+
+    // Variables para búsqueda
+    private string matriculaBusqueda = string.Empty;
+    private EstudianteDto? estudianteBuscado;
+
+    // Variables para nuevo registro
+    private EstudianteDto nuevoEstudiante = new();
+
+    // Variables para edición
+    private EstudianteDto? editandoEstudiante;
+    private int idEstudianteEditando = 0;
+
+    // Variables para eliminación
+    private bool mostrarConfirmacionEliminar = false;
+    private int idEstudianteAEliminar = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarEstudiantes();
+    }
+
+    private async Task CargarEstudiantes()
+    {
+        estudiantes = await EstudianteService.GetAll();
+    }
+    // Aqui esta el buscar por matricula 
+    private async Task BuscarPorMatricula()
+    {
+        if (string.IsNullOrWhiteSpace(matriculaBusqueda))
+        {
+            mensajeRegistro = "Por favor ingresa una matrícula";
+            return;
+        }
+
+        estudianteBuscado = await EstudianteService.GetByMatriculaAsync(matriculaBusqueda);
+
+        if (estudianteBuscado == null)
+        {
+            mensajeRegistro = "❌ No se encontró un estudiante con esa matrícula";
+        }
+    }
+    private async Task RegistrarEstudiante()
+    {
+        if (string.IsNullOrWhiteSpace(nuevoEstudiante.Nombre) ||
+            string.IsNullOrWhiteSpace(nuevoEstudiante.Apellido) ||
+            string.IsNullOrWhiteSpace(nuevoEstudiante.Matricula)
+            // || string.IsNullOrWhiteSpace(nuevoEstudiante.Email)
+            )
+        {
+            mensajeRegistro = "⚠️ Por favor completa todos los campos requeridos";
+            return;
+        }
+
+        bool resultado = await EstudianteService.CreateAsync(nuevoEstudiante);
+
+        if (resultado)
+        {
+            mensajeRegistro = "✅ Estudiante registrado exitosamente";
+            nuevoEstudiante = new(); // Limpiar formulario
+            await CargarEstudiantes(); // Actualizar lista
+        }
+        else
+        {
+            mensajeRegistro = "❌ Error al registrar el estudiante. Verifica que la matrícula sea única";
+        }
+    }
+    // Agregar estos métodos en @code
+    private void CargarParaEditar(EstudianteDto estudiante)
+    {
+        editandoEstudiante = new EstudianteDto
+        {
+            Id = estudiante.Id,
+            Nombre = estudiante.Nombre,
+            Apellido = estudiante.Apellido,
+            //Email = estudiante.Email,
+            Matricula = estudiante.Matricula
+        };
+        idEstudianteEditando = estudiante.Id;
+    }
+
+    private async Task GuardarCambios()
+    {
+        if (editandoEstudiante == null) return;
+
+        bool resultado = await EstudianteService.UpdateAsync(idEstudianteEditando, editandoEstudiante);
+
+        if (resultado)
+        {
+            mensajeRegistro = "✅ Estudiante actualizado exitosamente";
+            editandoEstudiante = null;
+            idEstudianteEditando = 0;
+            await CargarEstudiantes();
+        }
+        else
+        {
+            mensajeRegistro = "❌ Error al actualizar el estudiante";
+        }
+    }
+
+    private void CancelarEdicion()
+    {
+        editandoEstudiante = null;
+        idEstudianteEditando = 0;
+    }
+    private void ConfirmarEliminar(int id)
+    {
+        idEstudianteAEliminar = id;
+        mostrarConfirmacionEliminar = true;
+    }
+
+    private async Task EliminarEstudiante()
+    {
+        bool resultado = await EstudianteService.DeleteAsync(idEstudianteAEliminar);
+
+        if (resultado)
+        {
+            mensajeRegistro = "✅ Estudiante eliminado exitosamente";
+            mostrarConfirmacionEliminar = false;
+            idEstudianteAEliminar = 0;
+            await CargarEstudiantes();
+        }
+        else
+        {
+            mensajeRegistro = "❌ Error al eliminar el estudiante";
+        }
+    }
+
+    private void CancelarEliminar()
+    {
+        mostrarConfirmacionEliminar = false;
+        idEstudianteAEliminar = 0;
+    }
+}
